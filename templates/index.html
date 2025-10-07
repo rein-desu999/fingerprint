@@ -8,6 +8,7 @@
     <button onclick="sendCmd('1')">Enroll</button>
     <button onclick="sendCmd('2')">Search</button>
     <button onclick="sendCmd('3')">Delete</button>
+    <button onclick="clearLogs()">Clear Logs</button>
   </div>
 </div>
 
@@ -33,6 +34,12 @@ async function updateLogs() {
   document.getElementById("logBox").textContent = data.logs.join("\n");
 }
 
+async function clearLogs() {
+  await fetch("/clear_logs", { method: "POST" });
+  document.getElementById("logBox").textContent = "";
+}
+
 setInterval(updateLogs, 1000);
 </script>
 {% endblock %}
+

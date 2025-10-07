@@ -4,10 +4,11 @@ import threading
 import time
 import json
 import os
+import re
 
 app = Flask(__name__)
 
-SERIAL_PORT = "/dev/tty.usbmodem101"  # Update if needed
+SERIAL_PORT = "/dev/tty.usbmodem101"
 BAUD_RATE = 9600
 
 ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
@@ -15,28 +16,31 @@ logs = []
 db_file = "data.json"
 lock = threading.Lock()
 
-# Load or create the local "database"
+# Load database
 if os.path.exists(db_file):
     with open(db_file, "r") as f:
         database = json.load(f)
 else:
     database = []
 
-
-# Background thread to read serial logs
+# Background thread to read serial output
 def read_serial():
     global logs
+    pattern = re.compile(r"Match found! ID: (\d+).*")
     while True:
         if ser.in_waiting > 0:
             line = ser.readline().decode(errors="ignore").strip()
             if line:
                 with lock:
                     logs.append(line)
-                print(line)
+                    # Parse match and add Name
+                    match = pattern.match(line)
+                    if match:
+                        fid = match.group(1)
+                        name = next((u["name"] for u in database if u["id"] == fid), "Unknown")
+                        logs.append(f"✅ Match found: ID={fid} | Name={name}")
 
-
-thread = threading.Thread(target=read_serial, daemon=True)
-thread.start()
+threading.Thread(target=read_serial, daemon=True).start()
 
 
 @app.route("/")
@@ -62,17 +66,16 @@ def command():
             with open(db_file, "w") as f:
                 json.dump(database, f, indent=2)
             ser.write(f"{cmd},{fid}\n".encode())
-            logs.append(f"🟣 Enrolling ID {fid} ({name})...")
+            with lock:
+                logs.append(f"🟣 Enrolling ID {fid} ({name})...")
         else:
-            logs.append("❌ Please enter both ID and Name to enroll.")
+            with lock:
+                logs.append("❌ Please enter both ID and Name to enroll.")
 
     elif cmd == "2":  # Search
         ser.write(f"{cmd}\n".encode())
-        logs.append("🔍 Searching for fingerprint...")
-        # Mocked result for display purposes
-        time.sleep(1)
-        for user in database:
-            logs.append(f"✅ Match found: ID={user['id']} | Name={user['name']}")
+        with lock:
+            logs.append("🔍 Searching for fingerprint...")
 
     elif cmd == "3":  # Delete
         if fid:
@@ -80,9 +83,11 @@ def command():
             with open(db_file, "w") as f:
                 json.dump(database, f, indent=2)
             ser.write(f"{cmd},{fid}\n".encode())
-            logs.append(f"🗑️ Deleted ID {fid}")
+            with lock:
+                logs.append(f"🗑️ Deleted ID {fid}")
         else:
-            logs.append("❌ Please enter ID to delete.")
+            with lock:
+                logs.append("❌ Please enter ID to delete.")
 
     return jsonify(success=True)
 
@@ -92,13 +97,13 @@ def update_user():
     data = request.get_json()
     uid = data.get("id")
     new_name = data.get("name")
-
     for user in database:
         if user["id"] == uid:
             user["name"] = new_name
             with open(db_file, "w") as f:
                 json.dump(database, f, indent=2)
-            logs.append(f"✏️ Updated name for ID {uid} → {new_name}")
+            with lock:
+                logs.append(f"✏️ Updated name for ID {uid} → {new_name}")
             return jsonify(success=True)
     return jsonify(success=False), 404
 
@@ -107,17 +112,15 @@ def update_user():
 def delete_user():
     data = request.get_json()
     uid = data.get("id")
-
     before_count = len(database)
     database[:] = [u for u in database if u["id"] != uid]
     after_count = len(database)
-
     with open(db_file, "w") as f:
         json.dump(database, f, indent=2)
-
     if before_count != after_count:
-        logs.append(f"🗑️ Deleted user ID {uid} via dashboard.")
         ser.write(f"3,{uid}\n".encode())
+        with lock:
+            logs.append(f"🗑️ Deleted user ID {uid} via dashboard.")
         return jsonify(success=True)
     return jsonify(success=False), 404
 
@@ -125,7 +128,14 @@ def delete_user():
 @app.route("/logs")
 def get_logs():
     with lock:
-        return jsonify({"logs": logs[-50:]})
+        return jsonify({"logs": logs[-50:]})  # last 50 logs
+
+
+@app.route("/clear_logs", methods=["POST"])
+def clear_logs():
+    with lock:
+        logs.clear()
+    return jsonify(success=True)
 
 
 if __name__ == "__main__":
