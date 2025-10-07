@@ -3,32 +3,28 @@ import serial
 import threading
 import time
 
-# ===== Configure your serial port =====
-SERIAL_PORT = "/dev/tty.usbmodem101"  # <- Replace with your Arduino port
+# Replace with your Arduino port
+SERIAL_PORT = "/dev/tty.usbmodem101"
 BAUD_RATE = 9600
 
 ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
-time.sleep(2)  # wait for Arduino to reset
+time.sleep(2)  # Wait for Arduino reset
 
 app = Flask(__name__)
 
-# Store Arduino log messages
 arduino_logs = []
 
-# Thread to constantly read from Arduino
 def read_serial():
     while True:
         if ser.in_waiting:
             line = ser.readline().decode('utf-8', errors='ignore').strip()
             if line:
                 arduino_logs.append(line)
-                # Keep only last 50 messages
                 if len(arduino_logs) > 50:
                     arduino_logs.pop(0)
 
 threading.Thread(target=read_serial, daemon=True).start()
 
-# ===== Web Routes =====
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -38,7 +34,7 @@ def command():
     cmd = request.json.get("cmd")
     id_value = request.json.get("id", None)
 
-    if id_value is not None:
+    if id_value:
         full_cmd = f"{cmd},{id_value}\n"
     else:
         full_cmd = f"{cmd}\n"
