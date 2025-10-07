@@ -8,7 +8,7 @@ import re
 
 app = Flask(__name__)
 
-SERIAL_PORT = "/dev/tty.usbmodem101"  # Replace with your Arduino port
+SERIAL_PORT = "/dev/tty.usbmodem101"
 BAUD_RATE = 9600
 SEARCH_TIMEOUT = 3  # seconds
 
