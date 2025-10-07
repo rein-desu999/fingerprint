@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Registered Fingerprints</h3>
+  <table id="userTable">
+    <thead>
+      <tr><th>ID</th><th>Name</th><th>Fingerprint Image</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+async function loadUsers() {
+  const res = await fetch("/users");
+  const data = await res.json();
+  const tbody = document.querySelector("#userTable tbody");
+  tbody.innerHTML = "";
+  data.forEach(user => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${user.id}</td>
+        <td>${user.name}</td>
+        <td><img src="${user.image}" width="80"></td>
+      </tr>
+    `;
+  });
+}
+loadUsers();
+</script>
+{% endblock %}

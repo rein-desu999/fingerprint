@@ -1,50 +1,36 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Fingerprint Sensor Control</title>
-<style>
-body { font-family: Arial; padding: 20px; background: #f5f5f5; }
-button { margin: 5px; padding: 10px 20px; font-size: 16px; }
-#logs { margin-top: 20px; background: #fff; padding: 10px; height: 400px; overflow-y: scroll; border: 1px solid #ccc; white-space: pre-line; }
-input[type=number] { width: 60px; padding: 5px; font-size: 16px; }
-h2 { margin-bottom: 10px; }
-</style>
-</head>
-<body>
-<h2>Fingerprint Sensor Control</h2>
-
-<div>
-  <input type="number" id="idInput" placeholder="ID">
-  <button onclick="sendCommand('1')">Enroll</button>
-  <button onclick="sendCommand('2')">Search</button>
-  <button onclick="sendCommand('3')">Delete</button>
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h3>Fingerprint Control Panel</h3>
+  <input id="fingerId" type="number" placeholder="Enter ID">
+  <input id="fingerName" type="text" placeholder="Enter Name (for Enroll)">
+  <button onclick="sendCmd('1')">Enroll</button>
+  <button onclick="sendCmd('2')">Search</button>
+  <button onclick="sendCmd('3')">Delete</button>
 </div>
 
-<div id="logs"></div>
+<div class="card">
+  <h3>Live Logs</h3>
+  <pre id="logBox"></pre>
+</div>
 
 <script>
-function sendCommand(cmd) {
-    const id = document.getElementById("idInput").value;
-    fetch("/command", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({cmd: cmd, id: id})
-    });
+async function sendCmd(cmd) {
+  const id = document.getElementById("fingerId").value;
+  const name = document.getElementById("fingerName").value;
+  await fetch("/command", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cmd, id, name })
+  });
 }
 
-// Refresh logs every 300ms
-function refreshLogs() {
-    fetch("/logs")
-    .then(res => res.json())
-    .then(data => {
-        const logsDiv = document.getElementById("logs");
-        logsDiv.innerText = data.logs.join("\n");
-        logsDiv.scrollTop = logsDiv.scrollHeight; // auto scroll
-    });
+async function updateLogs() {
+  const res = await fetch("/logs");
+  const data = await res.json();
+  document.getElementById("logBox").textContent = data.logs.join("\n");
 }
 
-setInterval(refreshLogs, 300);
+setInterval(updateLogs, 1000);
 </script>
-</body>
-</html>
+{% endblock %}

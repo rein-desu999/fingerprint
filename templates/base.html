@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Fingerprint Dashboard</title>
+  <style>
+    body {
+      font-family: "Poppins", sans-serif;
+      background-color: #faf9f8;
+      margin: 0;
+      padding: 0;
+    }
+    nav {
+      background: #9fd1c7;
+      color: #fff;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    nav h2 { margin: 0; font-weight: 600; }
+    nav a {
+      color: white;
+      margin-left: 20px;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    nav a:hover {
+      text-decoration: underline;
+    }
+    .content {
+      padding: 30px;
+    }
+    button {
+      background: #91c8b0;
+      border: none;
+      color: white;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    button:hover {
+      background: #6aa894;
+    }
+    input {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 8px;
+      margin-right: 10px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    pre {
+      background: #111;
+      color: #0f0;
+      padding: 15px;
+      border-radius: 8px;
+      height: 300px;
+      overflow-y: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 10px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+    th {
+      background: #9fd1c7;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <h2>Fingerprint Dashboard</h2>
+    <div>
+      <a href="/">Control Panel</a>
+      <a href="/database">Database</a>
+    </div>
+  </nav>
+  <div class="content">
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>
