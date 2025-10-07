@@ -12,15 +12,18 @@ time.sleep(2)  # Wait for Arduino reset
 
 app = Flask(__name__)
 
+# Store last 100 Arduino log messages
 arduino_logs = []
 
+# Background thread to read Arduino Serial logs
 def read_serial():
     while True:
         if ser.in_waiting:
             line = ser.readline().decode('utf-8', errors='ignore').strip()
             if line:
                 arduino_logs.append(line)
-                if len(arduino_logs) > 50:
+                # Keep only the last 100 messages
+                if len(arduino_logs) > 100:
                     arduino_logs.pop(0)
 
 threading.Thread(target=read_serial, daemon=True).start()
@@ -34,6 +37,7 @@ def command():
     cmd = request.json.get("cmd")
     id_value = request.json.get("id", None)
 
+    # Format command as Arduino expects: "1,5\n", "2\n", etc.
     if id_value:
         full_cmd = f"{cmd},{id_value}\n"
     else:
