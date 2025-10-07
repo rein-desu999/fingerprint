@@ -34,16 +34,13 @@ def append_log(msg):
 arduino_buffer = []
 def read_serial():
     global arduino_buffer
-    pattern_match = re.compile(r"Match found! ID: (\d+).*")
-    pattern_enroll_ok = re.compile(r"Fingerprint ID #(\d+) stored successfully")
-    pattern_delete_ok = re.compile(r"Fingerprint ID #(\d+) deleted successfully")
-
     while True:
         if ser.in_waiting > 0:
             line = ser.readline().decode(errors="ignore").strip()
             if line:
                 arduino_buffer.append(line)
                 append_log(line)
+        time.sleep(0.01)
 
 threading.Thread(target=read_serial, daemon=True).start()
 
@@ -69,6 +66,11 @@ def command():
         if not fid or not name:
             append_log("❌ Please enter both ID and Name to enroll.")
             return jsonify(success=False)
+        # Check if ID already exists
+        if any(d["id"] == fid for d in database):
+            append_log(f"❌ ID {fid} already taken. Choose another.")
+            return jsonify(success=False)
+
         append_log(f"🟣 Enrolling ID {fid} ({name})...")
         database.append({"id": fid, "name": name})
         with open(db_file, "w") as f:
@@ -119,11 +121,17 @@ def command():
         if not fid:
             append_log("❌ Please enter ID to delete.")
             return jsonify(success=False)
-        ser.write(f"{cmd},{fid}\n".encode())
+        if not any(d["id"] == fid for d in database):
+            append_log(f"❌ ID {fid} not found in database.")
+            return jsonify(success=False)
+
+        # Remove locally
         database[:] = [d for d in database if d["id"] != fid]
         with open(db_file, "w") as f:
             json.dump(database, f, indent=2)
-        append_log(f"🗑️ Deleted ID {fid}")
+        # Send delete to Arduino
+        ser.write(f"{cmd},{fid}\n".encode())
+        append_log(f"🗑️ Deleted ID {fid} from database and sent command to Arduino.")
 
     return jsonify(success=True)
 
