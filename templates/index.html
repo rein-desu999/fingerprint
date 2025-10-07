@@ -4,9 +4,11 @@
   <h3>Fingerprint Control Panel</h3>
   <input id="fingerId" type="number" placeholder="Enter ID">
   <input id="fingerName" type="text" placeholder="Enter Name (for Enroll)">
-  <button onclick="sendCmd('1')">Enroll</button>
-  <button onclick="sendCmd('2')">Search</button>
-  <button onclick="sendCmd('3')">Delete</button>
+  <div class="btn-group">
+    <button onclick="sendCmd('1')">Enroll</button>
+    <button onclick="sendCmd('2')">Search</button>
+    <button onclick="sendCmd('3')">Delete</button>
+  </div>
 </div>
 
 <div class="card">

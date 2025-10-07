@@ -2,30 +2,62 @@
 {% block content %}
 <div class="card">
   <h3>Registered Fingerprints</h3>
+
+  {% if users %}
   <table id="userTable">
-    <thead>
-      <tr><th>ID</th><th>Name</th><th>Fingerprint Image</th></tr>
-    </thead>
-    <tbody></tbody>
+    <tr>
+      <th>ID</th>
+      <th>Name</th>
+      <th>Fingerprint Image</th>
+      <th>Actions</th>
+    </tr>
+    {% for user in users %}
+    <tr>
+      <td>{{ user.id }}</td>
+      <td contenteditable="true" onblur="updateName('{{ user.id }}', this.textContent)">
+        {{ user.name }}
+      </td>
+      <td><img src="{{ url_for('static', filename='placeholder_fingerprint.png') }}" alt="Fingerprint" width="80"></td>
+      <td>
+        <button onclick="deleteUser('{{ user.id }}')">Delete</button>
+      </td>
+    </tr>
+    {% endfor %}
   </table>
+  {% else %}
+  <p>No registered fingerprints found.</p>
+  {% endif %}
 </div>
 
 <script>
-async function loadUsers() {
-  const res = await fetch("/users");
-  const data = await res.json();
-  const tbody = document.querySelector("#userTable tbody");
-  tbody.innerHTML = "";
-  data.forEach(user => {
-    tbody.innerHTML += `
-      <tr>
-        <td>${user.id}</td>
-        <td>${user.name}</td>
-        <td><img src="${user.image}" width="80"></td>
-      </tr>
-    `;
+async function updateName(id, newName) {
+  const res = await fetch("/update_user", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, name: newName })
   });
+  const result = await res.json();
+  if (result.success) {
+    alert(`✅ Name for ID ${id} updated to "${newName}"`);
+  } else {
+    alert(`❌ Failed to update name for ID ${id}`);
+  }
 }
-loadUsers();
+
+async function deleteUser(id) {
+  if (!confirm(`Delete fingerprint ID ${id}?`)) return;
+  const res = await fetch("/delete_user", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id })
+  });
+  const result = await res.json();
+  if (result.success) {
+    alert(`🗑️ Deleted ID ${id}`);
+    location.reload();
+  } else {
+    alert(`❌ Failed to delete ID ${id}`);
+  }
+}
 </script>
 {% endblock %}

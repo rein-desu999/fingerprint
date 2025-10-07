@@ -5,84 +5,130 @@ import time
 import json
 import os
 
-SERIAL_PORT = "/dev/tty.usbmodem101"
+app = Flask(__name__)
+
+SERIAL_PORT = "/dev/tty.usbmodem101"  # Update if needed
 BAUD_RATE = 9600
 
-# Initialize serial
 ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
-time.sleep(2)
+logs = []
+db_file = "data.json"
+lock = threading.Lock()
 
-app = Flask(__name__)
-arduino_logs = []
-DATA_FILE = "data.json"
+# Load or create the local "database"
+if os.path.exists(db_file):
+    with open(db_file, "r") as f:
+        database = json.load(f)
+else:
+    database = []
 
-# Load existing user data
-if not os.path.exists(DATA_FILE):
-    with open(DATA_FILE, "w") as f:
-        json.dump([], f)
 
-def load_data():
-    with open(DATA_FILE, "r") as f:
-        return json.load(f)
-
-def save_data(data):
-    with open(DATA_FILE, "w") as f:
-        json.dump(data, f, indent=4)
-
+# Background thread to read serial logs
 def read_serial():
+    global logs
     while True:
-        if ser.in_waiting:
-            try:
-                line = ser.readline().decode("utf-8", errors="ignore").strip()
-                if line:
-                    arduino_logs.append(line)
-                    if len(arduino_logs) > 200:
-                        arduino_logs.pop(0)
-            except Exception as e:
-                print("Serial read error:", e)
-        time.sleep(0.05)
+        if ser.in_waiting > 0:
+            line = ser.readline().decode(errors="ignore").strip()
+            if line:
+                with lock:
+                    logs.append(line)
+                print(line)
 
-threading.Thread(target=read_serial, daemon=True).start()
+
+thread = threading.Thread(target=read_serial, daemon=True)
+thread.start()
+
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
+
+@app.route("/database")
+def database_page():
+    return render_template("database.html", users=database)
+
+
 @app.route("/command", methods=["POST"])
 def command():
-    cmd = request.json.get("cmd")
-    id_value = request.json.get("id")
-    name_value = request.json.get("name")
+    data = request.get_json()
+    cmd = data.get("cmd")
+    fid = data.get("id")
+    name = data.get("name", "")
 
-    if cmd == "1" and id_value:
-        # Add to database before enrolling
-        users = load_data()
-        if not any(u["id"] == id_value for u in users):
-            users.append({"id": id_value, "name": name_value, "image": "static/fingerprint.png"})
-            save_data(users)
-        ser.write(f"1,{id_value}\n".encode())
-    elif cmd == "2":
-        ser.write(b"2\n")
-    elif cmd == "3" and id_value:
-        # Remove from database
-        users = load_data()
-        users = [u for u in users if u["id"] != id_value]
-        save_data(users)
-        ser.write(f"3,{id_value}\n".encode())
-    else:
-        return jsonify({"error": "Invalid command"}), 400
+    if cmd == "1":  # Enroll
+        if fid and name:
+            database.append({"id": fid, "name": name})
+            with open(db_file, "w") as f:
+                json.dump(database, f, indent=2)
+            ser.write(f"{cmd},{fid}\n".encode())
+            logs.append(f"🟣 Enrolling ID {fid} ({name})...")
+        else:
+            logs.append("❌ Please enter both ID and Name to enroll.")
 
-    ser.flush()
-    return jsonify({"status": "sent"})
+    elif cmd == "2":  # Search
+        ser.write(f"{cmd}\n".encode())
+        logs.append("🔍 Searching for fingerprint...")
+        # Mocked result for display purposes
+        time.sleep(1)
+        for user in database:
+            logs.append(f"✅ Match found: ID={user['id']} | Name={user['name']}")
+
+    elif cmd == "3":  # Delete
+        if fid:
+            database[:] = [d for d in database if d["id"] != fid]
+            with open(db_file, "w") as f:
+                json.dump(database, f, indent=2)
+            ser.write(f"{cmd},{fid}\n".encode())
+            logs.append(f"🗑️ Deleted ID {fid}")
+        else:
+            logs.append("❌ Please enter ID to delete.")
+
+    return jsonify(success=True)
+
+
+@app.route("/update_user", methods=["POST"])
+def update_user():
+    data = request.get_json()
+    uid = data.get("id")
+    new_name = data.get("name")
+
+    for user in database:
+        if user["id"] == uid:
+            user["name"] = new_name
+            with open(db_file, "w") as f:
+                json.dump(database, f, indent=2)
+            logs.append(f"✏️ Updated name for ID {uid} → {new_name}")
+            return jsonify(success=True)
+    return jsonify(success=False), 404
+
+
+@app.route("/delete_user", methods=["POST"])
+def delete_user():
+    data = request.get_json()
+    uid = data.get("id")
+
+    before_count = len(database)
+    database[:] = [u for u in database if u["id"] != uid]
+    after_count = len(database)
+
+    with open(db_file, "w") as f:
+        json.dump(database, f, indent=2)
+
+    if before_count != after_count:
+        logs.append(f"🗑️ Deleted user ID {uid} via dashboard.")
+        ser.write(f"3,{uid}\n".encode())
+        return jsonify(success=True)
+    return jsonify(success=False), 404
+
 
 @app.route("/logs")
-def logs():
-    return jsonify({"logs": arduino_logs[-100:]})
+def get_logs():
+    with lock:
+        return jsonify({"logs": logs[-50:]})
 
-@app.route("/users")
-def users():
-    return jsonify(load_data())
 
 if __name__ == "__main__":
-    app.run(debug=True)
-# To run the app, use the command: python app.py
+    app.run(host="0.0.0.0", port=5000, debug=True)
+
+# To run: python app.py
